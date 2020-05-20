@@ -14,7 +14,6 @@ Debug/
 Release/
 **/Debug
 **/glm
-*.code-workspace
 .venv_*
 .vscode
 .ipynb_checkpoints
