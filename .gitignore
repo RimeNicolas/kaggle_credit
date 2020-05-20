@@ -19,3 +19,5 @@ Release/
 .ipynb_checkpoints
 
 path_data.txt
+__pycache__
+
