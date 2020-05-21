@@ -20,4 +20,4 @@ Release/
 
 path_data.txt
 __pycache__
-
+*.csv
