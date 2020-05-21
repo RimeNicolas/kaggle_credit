@@ -105,14 +105,16 @@ def run_test(X, y, model, keys, params1, params2):
     return df
 
 if __name__ == '__main__':
-    nb_trees = np.arange(50,101,50)
-    max_depths = np.arange(1,3,1)
-    #X, y = prepare_data()
-    from sklearn import datasets
-    cancer = datasets.load_breast_cancer()
-    X = cancer.data
-    y = cancer.target
+    nb_trees = np.arange(50,151,50)
+    max_depths = np.arange(1,5,1)
+    X, y = prepare_data()
+    # from sklearn import datasets
+    # cancer = datasets.load_breast_cancer()
+    # X = cancer.data
+    # y = cancer.target
     model = RandomForestClassifier
     keys = ['n_estimators', 'max_depth']
     df = run_test(X, y, model, keys, nb_trees, max_depths)
-    df.to_csv('cancer_out.csv', index=False)
+    df.insert(0, keys[0], np.repeat(nb_trees, len(max_depths)), allow_duplicates=True)
+    df.insert(1, keys[1], (len(nb_trees) * list(max_depths)), allow_duplicates=True)
+    df.to_csv('credit_scores.csv', index=False)
