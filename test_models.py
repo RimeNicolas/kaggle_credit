@@ -2,23 +2,26 @@ import os
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt 
+import time
+import yaml
 
 from collections import Counter
 
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import AdaBoostClassifier
+
 from sklearn.model_selection import train_test_split
 from sklearn.model_selection import KFold
 from sklearn.model_selection import ShuffleSplit
 from sklearn.model_selection import StratifiedKFold
+
 from sklearn.metrics import roc_curve, auc
 from sklearn.metrics import roc_auc_score
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import f1_score
 
-def load_data():
-    with open('path_data.txt', 'r') as f:
-        dir_data = f.read()
-    return pd.read_csv(os.path.join(dir_data, 'creditcard.csv'))
+def load_data(dir_data, csv_name):
+    return pd.read_csv(os.path.join(dir_data, csv_name))
 
 def build_dict_feature(df):
     dict_feature = dict()
@@ -34,24 +37,13 @@ def build_array_feature(df):
         array_feature.append(l / np.linalg.norm(l))
     return np.array(array_feature)
 
-def prepare_data():
-    df = load_data()
+def prepare_data(dir_data, csv_name):
+    df = load_data(dir_data, csv_name)
     X = build_array_feature(df).T
     y = np.array(df['Class'])
     return X, y
 
-def plot_roc(parameter, list_fpr_rt, list_tpr_rt):
-    plt.figure(1)
-    plt.plot([0, 1], [0, 1], 'k--')
-    for i in range(len(parameter)):
-        plt.plot(list_fpr_rt[i], list_tpr_rt[i], label=parameter[i])
-    plt.xlabel('False positive rate')
-    plt.ylabel('True positive rate')
-    plt.title('ROC curve')
-    plt.legend(loc='best')
-    plt.show()
-
-def run_test(X, y, model, keys, params1, params2):
+def test_parameters(X, y, model, keys, params1, params2):
     scores = np.zeros(len(params1) * len(params2))
     tn = np.zeros(len(params1) * len(params2))
     fp = np.zeros(len(params1) * len(params2))
@@ -104,17 +96,69 @@ def run_test(X, y, model, keys, params1, params2):
     df = pd.DataFrame(data=d)
     return df
 
-if __name__ == '__main__':
-    nb_trees = np.arange(50,151,50)
-    max_depths = np.arange(1,5,1)
-    X, y = prepare_data()
-    # from sklearn import datasets
-    # cancer = datasets.load_breast_cancer()
-    # X = cancer.data
-    # y = cancer.target
+def prepare_X_y(dataset_name, dir_data):
+    if dataset_name == 'cancer':
+        from sklearn import datasets
+        cancer = datasets.load_breast_cancer()
+        X = cancer.data
+        y = cancer.target
+    elif dataset_name == 'credit':
+        X, y = prepare_data(dir_data, 'creditcard.csv')
+    else:
+        return
+    return X, y
+
+def test_parameters_random_forest(dataset_name, X,y):
     model = RandomForestClassifier
+    model_str = 'Rand_Forest'
     keys = ['n_estimators', 'max_depth']
-    df = run_test(X, y, model, keys, nb_trees, max_depths)
-    df.insert(0, keys[0], np.repeat(nb_trees, len(max_depths)), allow_duplicates=True)
-    df.insert(1, keys[1], (len(nb_trees) * list(max_depths)), allow_duplicates=True)
-    df.to_csv('credit_scores.csv', index=False)
+    nb_trees = np.arange(50,101,50)
+    max_depths = np.arange(6,13,2)
+    print('Testing parameters for model :', model_str)
+    df = test_parameters(X, y, model, keys, nb_trees, max_depths)
+    df.insert(0, 'model', model_str, allow_duplicates=True)
+    df.insert(1, keys[0], np.repeat(nb_trees, len(max_depths)), allow_duplicates=True)
+    df.insert(2, keys[1], (len(nb_trees) * list(max_depths)), allow_duplicates=True)
+    timestr = time.strftime('%d_%m_%Y_%H_%M')
+    df.to_csv('_'.join(['./csv_dir/' + dataset_name, model_str, timestr + '.csv']), index=False)
+
+def test_parameters_adaboost(dataset_name, X, y):
+    model = AdaBoostClassifier
+    model_str = 'AdaBoost'
+    keys = ['n_estimators', 'learning_rate']
+    n_estimators = np.arange(100,161,20)
+    learning_rates = np.arange(0.5,1.6,0.5)
+    print('Testing parameters for model :', model_str)
+    df = test_parameters(X, y, model, keys, n_estimators, learning_rates)
+    df.insert(0, 'model', model_str, allow_duplicates=True)
+    df.insert(1, keys[0], np.repeat(n_estimators, len(learning_rates)), allow_duplicates=True)
+    df.insert(2, keys[1], (len(n_estimators) * list(learning_rates)), allow_duplicates=True)
+    timestr = time.strftime('%d_%m_%Y_%H_%M')
+    df.to_csv('_'.join(['./csv_dir/' + dataset_name, model_str, timestr + '.csv']), index=False)
+
+def timeit(f):
+    def timed(*args, **kwargs):
+        t0 = time.time()
+        ret = f(*args, **kwargs)
+        print('execution time of {} : {:.2f} s'.format(f.__name__, time.time() - t0))
+        return ret
+    return timed
+
+def run_tests(dataset_name, dir_data):
+    X, y = prepare_X_y(dataset_name, dir_data)
+    if X is None:
+        return
+    timeit(test_parameters_random_forest)(dataset_name, X, y)
+    timeit(test_parameters_adaboost)(dataset_name, X, y)
+
+def yaml_loader(filepath):
+    with open(filepath, 'r') as f:
+        data = yaml.load(stream=f, Loader=yaml.FullLoader)
+    return data
+
+if __name__ == '__main__':
+    # dataset_name = 'cancer'
+    # dataset_name = 'credit'
+
+    kwargs = yaml_loader('./config.yaml')
+    run_tests(**kwargs)
